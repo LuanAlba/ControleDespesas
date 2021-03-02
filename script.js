@@ -29,45 +29,50 @@ const removeTransaction = ID => {
 
 //adicionar elas no DOM, para que a lista de transações (ul vazia por enquanto) seja preenchida criando uma função para adiciona-las
 //criando uma função gerando uma <li> com os dados da transação para ser adicionada ao DOM
-const addTransactionIntoDOM = transaction => {
+const addTransactionIntoDOM = ({ amount, name, id})=> {
     //identificar se é um valor negativo ou positivo
-    const operator = transaction.amount < 0 ? '-' : '+'
-    const CSSClass = transaction.amount < 0 ? 'minus' : 'plus'
-    const amountWithoutOperator = Math.abs(transaction.amount) // para simplificar a interpolação na li 
+    const operator = amount < 0 ? '-' : '+'
+    const CSSClass = amount < 0 ? 'minus' : 'plus'
+    const amountWithoutOperator = Math.abs(amount) // para simplificar a interpolação na li 
     const li = document.createElement('li') // afirmando que o que será criado sera uma <li>
 
     //usando a CSSClass para identificar o operator, com metodo add
     li.classList.add(CSSClass)
     //innerHTML para substituir quando a função for usada
     li.innerHTML = `
-        ${transaction.name} 
+        ${name} 
         <span>${operator} R$ ${amountWithoutOperator}</span>
-        <button class="delete-btn" onClick="removeTransaction(${transaction.id})">
-        x
-        </button>
+        <button class="delete-btn" onClick="removeTransaction(${id})">x</button>
     `
     transactionsUL.append(li)
 }
 
+// receber um array só com as despesas das transaçoes
+const getExpenses = transactionsAmount => Math.abs(transactionsAmount
+    .filter(value => value < 0)
+    .reduce((accumulator, value) => accumulator + value, 0))
+    .toFixed(2)
+
+//filter para criar um array com valores positivos e soma-los
+const getIncome = transactionsAmount => transactionsAmount
+    .filter(value => value > 0)
+    .reduce((accumulator, value) => accumulator + value, 0)
+    .toFixed(2)
+
+//usando reduce para transformar o array em um unico número
+//accumulator recebe o parametro amount e calcula com o valor transaction, em loop até nao haver mais accumulator atribuindo para total
+// toFixed() para acrescentar o valor decimal, no caso dois
+const getTotal = transactionsAmount => transactionsAmount
+    .reduce((accumulator, transaction) => accumulator + transaction, 0)
+    .toFixed(2)
+
 const updateBalanceValues = () => {
     //map para buscar apenas o transaction.amount
-    const transactionsAmount = transactions.map(transaction => transaction.amount)
-    //usando reduce para transformar o array em um unico número
-    //accumulator recebe o parametro amount e calcula com o valor transaction, em loop até nao haver mais accumulator atribuindo para total
-    // toFixed() para acrescentar o valor decimal, no caso dois
-    const total = transactionsAmount
-        .reduce((accumulator, transaction) => accumulator + transaction, 0)
-        .toFixed(2)
-    //filter para criar um array com valores positivos e soma-los
-    const income = transactionsAmount
-        .filter(value => value > 0)
-        .reduce((accumulator, value) => accumulator + value, 0)
-        .toFixed(2)
-    // receber um array só com as despesas das transaçoes
-    const expense = Math.abs(transactionsAmount
-        .filter(value => value < 0)
-        .reduce((accumulator, value) => accumulator + value, 0))
-        .toFixed(2)
+    //feito destructing
+    const transactionsAmount = transactions.map(({ amount }) => amount)
+    const total = getTotal(transactionsAmount)
+    const income = getIncome(transactionsAmount)
+    const expense = getExpenses(transactionsAmount)
 
     balanceDisplay.textContent = `R$ ${total}`
     incomeDisplay.textContent = `R$ ${income}`
@@ -91,30 +96,39 @@ const updateLocalStorage = () => {
 //adicionando ID aleatórios
 const generateID = () => Math.round(Math.random() * 1000)
 
-//inserir um listener de eventos no form
-form.addEventListener('submit', event => {
+//montando o array a ser preenchido
+const addToTransactionsArray = (transactionName, transactionAmount) => {
+    transactions.push({
+        id: generateID(),
+        name: transactionName,
+        amount: Number(transactionAmount) //para transformar a string gerada em numero, para que o toFixed() funcionar corretamente
+    })
+}
+
+//limpando dados
+const cleanInputs = () => {
+    inputTransactionName.value = ''
+    inputTransactionAmount.value = ''
+}
+
+const handleFormSubmit = event => {
     event.preventDefault() // para não enviar o listener
 
     //guardando os dados inseridos
     const transactionName = inputTransactionName.value.trim()
     const transactionAmount = inputTransactionAmount.value.trim()
+    const isSomeInputEmpty = transactionName === '' || transactionAmount === ''
 
-    if (transactionName === '' || transactionAmount === '') {
+    if (isSomeInputEmpty) {
         alert('Por favor, preencha TODOS os campos corretamente')
         return
     }
 
-    const transaction = {
-        id: generateID(),
-        name: transactionName,
-        amount: Number(transactionAmount) //para transformar a string gerada em numero, para que o toFixed() funcionar corretamente
-    }
-    //inserindo o objeto em dummy transactions
-    transactions.push(transaction)
+    addToTransactionsArray(transactionName, transactionAmount)
     init()
     updateLocalStorage()
+    cleanInputs() 
+}
 
-    //limpando dados
-    inputTransactionName.value = ''
-    inputTransactionAmount.value = ''
-})
+//inserir um listener de eventos no form
+form.addEventListener('submit', handleFormSubmit)
